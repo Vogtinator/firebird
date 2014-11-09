@@ -1,13 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
+#include "emu.h"
 #include "casplus.h"
 #include "schedule.h"
 #include "keypad.h"
 #include "cpu.h"
 #include "flash.h"
-#include "emu.h"
 #include "misc.h"
 #include "memory.h"
 
