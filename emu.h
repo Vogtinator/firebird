@@ -10,6 +10,12 @@ static inline u32 BSWAP32(u32 x) {
 	asm ("bswap %0" : "=r" (x) : "0" (x)); return x;
 }
 
+#ifdef __x86__
+#define FASTCALL __attribute__((fastcall))
+#else
+#define FASTCALL
+#endif
+
 /* Declarations for emu.c */
 
 extern int cycle_count_delta __asm__("cycle_count_delta");

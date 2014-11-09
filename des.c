@@ -1,5 +1,5 @@
-#include <stdbool.h>
 #include <string.h>
+#include "emu.h"
 #include "types.h"
 #include "memory.h"
 
