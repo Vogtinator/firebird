@@ -4,13 +4,11 @@ CONFIG += c++11
 TEMPLATE = app
 TARGET = nspire_emu
 
-QMAKE_CFLAGS += -std=gnu11 -Wall -Wextra
+QMAKE_CFLAGS += -O3 -std=gnu11 -Wall -Wextra
 
 #Override bad default options
 QMAKE_CFLAGS_RELEASE = -O3
 QMAKE_CXXFLAGS_RELEASE = -O3
-QMAKE_CFLAGS_DEBUG = -g -O0
-QMAKE_CXXFLAGS_DEBUG = -g -O0
 
 #This does also apply to android
 linux|macx {
