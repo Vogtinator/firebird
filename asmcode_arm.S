@@ -128,7 +128,7 @@ write_half: .global write_half
         orr             r3, r3, #1
         ldr             r3, [r2, r3, lsl #2] // r3 contains ac_entry
         tst             r3, #AC_FLAGS
-        streqh          r1, [r3, r0]
+        strheq          r1, [r3, r0]
         bxeq            lr
         tst             r3, #AC_INVALID
         bne             write_half_invalid
@@ -152,7 +152,7 @@ write_byte: .global write_byte
         orr             r3, r3, #1
         ldr             r3, [r2, r3, lsl #2] // r3 contains ac_entry
         tst             r3, #AC_FLAGS
-        streqb          r1, [r3, r0]
+        strbeq          r1, [r3, r0]
         bxeq            lr
         tst             r3, #AC_INVALID
         bne             write_byte_invalid
@@ -199,7 +199,7 @@ read_half: .global read_half
         bic             r3, r3, #1
         ldr             r3, [r2, r3, lsl #2] // r3 contains ac_entry
         tst             r3, #AC_FLAGS
-        ldreqh          r0, [r3, r0]
+        ldrheq          r0, [r3, r0]
         bxeq            lr
         tst             r3, #AC_INVALID
         bne             read_half_invalid
@@ -223,7 +223,7 @@ read_byte: .global read_byte
         bic             r3, r3, #1
         ldr             r3, [r2, r3, lsl #2] // r3 contains ac_entry
         tst             r3, #AC_FLAGS
-        ldreqb          r0, [r3, r0]
+        ldrbeq          r0, [r3, r0]
         bxeq            lr
         tst             r3, #AC_INVALID
         bne             read_byte_invalid
