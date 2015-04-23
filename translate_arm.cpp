@@ -180,7 +180,7 @@ static void emit_mov(uint8_t rd, uint32_t imm)
 	else
     {
         // movw/movt only available on >= armv6
-        #ifndef __ARM_ARCH_7__
+        #if !defined(__ARM_ARCH_7__) && !defined(__ARM_ARCH_6__)
                 emit_al(0x3000000 | (rd << 12) | ((imm & 0xF000) << 16) | (imm & 0xFFF)); // movw rd, #imm&0xFFFF
                 imm >>= 16;
                 if(imm)

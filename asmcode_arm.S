@@ -12,6 +12,13 @@ translation_pc_ptr: .global translation_pc_ptr
 
 .text
 
+#ifdef __clang__
+        #define streqh strheq
+        #define streqb strbeq
+        #define ldreqh ldrheq
+        #define ldreqb ldrbeq
+#endif
+
 #define RF_CODE_TRANSLATED   32
 #define RFS_TRANSLATION_INDEX 9
 
@@ -128,7 +135,7 @@ write_half: .global write_half
         orr             r3, r3, #1
         ldr             r3, [r2, r3, lsl #2] // r3 contains ac_entry
         tst             r3, #AC_FLAGS
-        strheq          r1, [r3, r0]
+        streqh          r1, [r3, r0]
         bxeq            lr
         tst             r3, #AC_INVALID
         bne             write_half_invalid
@@ -152,7 +159,7 @@ write_byte: .global write_byte
         orr             r3, r3, #1
         ldr             r3, [r2, r3, lsl #2] // r3 contains ac_entry
         tst             r3, #AC_FLAGS
-        strbeq          r1, [r3, r0]
+        streqb          r1, [r3, r0]
         bxeq            lr
         tst             r3, #AC_INVALID
         bne             write_byte_invalid
@@ -199,7 +206,7 @@ read_half: .global read_half
         bic             r3, r3, #1
         ldr             r3, [r2, r3, lsl #2] // r3 contains ac_entry
         tst             r3, #AC_FLAGS
-        ldrheq          r0, [r3, r0]
+        ldreqh          r0, [r3, r0]
         bxeq            lr
         tst             r3, #AC_INVALID
         bne             read_half_invalid
@@ -223,7 +230,7 @@ read_byte: .global read_byte
         bic             r3, r3, #1
         ldr             r3, [r2, r3, lsl #2] // r3 contains ac_entry
         tst             r3, #AC_FLAGS
-        ldrbeq          r0, [r3, r0]
+        ldreqb          r0, [r3, r0]
         bxeq            lr
         tst             r3, #AC_INVALID
         bne             read_byte_invalid
