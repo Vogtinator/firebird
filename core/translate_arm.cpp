@@ -233,6 +233,31 @@ static void emit_str_flags()
     // r11 is written to arm.cpsr_flags in translation_next and the memory access helpers in asmcode_arm.S
 }
 
+static bool flags_loaded = false, flags_changed = false;
+
+static void need_flags()
+{
+    if(flags_loaded)
+        return;
+
+    emit_ldr_flags();
+    flags_loaded = true;
+}
+
+static void changed_flags()
+{
+    flags_changed = true;
+}
+
+static void flush_flags()
+{
+    if(!flags_loaded || !flags_changed)
+        return;
+
+    emit_str_flags();
+    flags_loaded = flags_changed = false;
+}
+
 // Sets phys. rd to phys. rn
 static void emit_mov_reg(unsigned int rd, unsigned int rn)
 {
@@ -313,6 +338,7 @@ static void emit_flush_regs()
 // Has to be called before anything that might cause a translation leave!
 static void emit_save_state()
 {
+    flush_flags();
     emit_flush_regs();
 }
 
@@ -441,7 +467,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
         // after_inst: @ next instruction
         if(i.cond != CC_AL)
         {
-            emit_ldr_flags();
+            need_flags();
             cond_branch = translate_current;
             emit(0x0a000000 | ((i.cond ^ 1) << 28));
         }
@@ -516,9 +542,9 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
                 if(i.mult.s)
                 {
-                    emit_ldr_flags();
+                    need_flags();
                     emit(translated.raw);
-                    emit_str_flags();
+                    changed_flags();
                 }
                 else
                     emit(translated.raw);
@@ -590,6 +616,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                 if(i.bx.rm == PC)
                     goto unimpl;
 
+<<<<<<< HEAD:core/translate_arm.cpp
                 emit_save_state();
                 if(i.bx.l)
                 {
@@ -656,13 +683,14 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                         || (!i.data_proc.reg_shift && i.data_proc.shift == SH_ROR))) // ROR with #0 as imm is RRX (not everything checked)
             {
                 // This instruction impacts the flags, load them...
-                emit_ldr_flags();
+                need_flags();
 
                 // Emit the instruction itself
                 emit(translated.raw);
 
-                // ... and store them again
-                emit_str_flags();
+                // ... and store them again if modified
+                if(setcc || (!i.data_proc.reg_shift && i.data_proc.shift == SH_ROR))
+                    changed_flags();
             }
             else
                 emit(translated.raw);
