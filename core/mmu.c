@@ -12,8 +12,11 @@ static uint32_t mmu_translation_table[0x1000];
 
 void mmu_dump_tables(void) {
     uint32_t i, j;
-    gui_debug_printf("MMU translations:\n");
     uint32_t *tt = (uint32_t*)phys_mem_ptr(arm.translation_table_base, 0x4000);
+    if(!tt)
+        return gui_debug_printf("Translation table not readable.\n");
+
+    gui_debug_printf("MMU translations:\n");
     for (i = 0; i < 0x1000; i++) {
         uint32_t tt_entry = tt[i];
         uint32_t virt_addr = i << 20;
