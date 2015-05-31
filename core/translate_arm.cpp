@@ -909,13 +909,16 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
     RAM_FLAGS(insn_ptr) |= RF_CODE_NO_TRANSLATE;
 
     exit_translation:
-    emit_mov_imm(R0, pc);
-    emit_save_state();
-    emit_jmp(reinterpret_cast<void*>(translation_next));
 
     // Did we do any translation at all?
     if(insn_ptr == insn_ptr_start)
         return;
+    else
+    {
+        emit_save_state();
+        emit_mov_imm(0, pc);
+        emit_jmp(reinterpret_cast<void*>(translation_next));
+    }
 
     this_translation->end_ptr = insn_ptr;
     // This effectively flushes this_translation, as it won't get used next time
