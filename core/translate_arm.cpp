@@ -251,10 +251,9 @@ static void changed_flags()
 
 static void flush_flags()
 {
-    if(!flags_loaded || !flags_changed)
-        return;
+    if(flags_loaded && flags_changed)
+        emit_str_flags();
 
-    emit_str_flags();
     flags_loaded = flags_changed = false;
 }
 
@@ -704,8 +703,9 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             }
         }
         else if((insn & 0xC000000) == 0x4000000)
-        {goto unimpl;
+        {
             // Memory access: LDR, STRB, etc.
+            emit_save_state();
 
             // User mode access not implemented
             if(!i.mem_proc.p && i.mem_proc.w)
@@ -771,7 +771,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                 Instruction off;
                 off.raw = 0xe1a05000; // mov r5, something
                 off.raw |= insn & 0xFFF; // Copy shifter_operand
-                off.data_proc.rm = 1;
+                off.data_proc.rm = R1;
                 if(i.mem_proc.rm != PC)
                     emit_ldr_armreg(R1, i.mem_proc.rm);
                 else
