@@ -50,8 +50,10 @@ extern void *translation_pc_ptr __asm__("translation_pc_ptr");
 struct translation translation_table[MAX_TRANSLATIONS];
 uint32_t *jump_table[MAX_TRANSLATIONS*2],
          **jump_table_current = jump_table,
+         **jump_table_end = jump_table + (MAX_TRANSLATIONS*2),
          map_table[MAX_TRANSLATIONS*2],
-         *map_table_current = map_table;
+         *map_table_current = map_table,
+         *map_table_end = map_table + (MAX_TRANSLATIONS*2);
 
 static uint32_t *translate_buffer = nullptr,
          *translate_current = nullptr,
@@ -257,12 +259,6 @@ static void flush_flags()
     flags_loaded = flags_changed = false;
 }
 
-// Sets phys. rd to phys. rn
-static void emit_mov_reg(unsigned int rd, unsigned int rn)
-{
-    emit_al(0x1a00000 | (rd << 12) | rn);
-}
-
 // Sets phys. rd to imm
 static void emit_mov_imm(unsigned int rd, uint32_t imm)
 {
@@ -388,10 +384,13 @@ void translate_deinit()
 
 void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 {
-    if(next_translation_index >= MAX_TRANSLATIONS)
+    if(translate_current + 0x200 > translate_end
+        || next_translation_index >= MAX_TRANSLATIONS
+        || jump_table_current == jump_table_end
+        || map_table_current == map_table_end)
     {
-        warn("Out of translation slots!");
-        return;
+        gui_debug_printf("No space left for translation, flushing old ones.");
+        flush_translations();
     }
 
     uint32_t **jump_table_start = jump_table_current, *map_table_start = map_table_current;
@@ -429,6 +428,8 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
         // Translate further?
         if(stop_here
             || translate_current + 0x200 > translate_end
+            || jump_table_current == jump_table_end
+            || map_table_current == map_table_end
             || RAM_FLAGS(insn_ptr) & (RF_EXEC_BREAKPOINT | RF_EXEC_DEBUG_NEXT | RF_EXEC_HACK | RF_CODE_TRANSLATED | RF_CODE_NO_TRANSLATE)
             || (pc ^ pc_start) & ~0xfff)
             goto exit_translation;
@@ -473,7 +474,6 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
         if((insn & 0xE000090) == 0x0000090)
         {
-            emit_save_state();
             if(!i.mem_proc2.s && !i.mem_proc2.h)
             {
                 // Not mem_proc2 -> multiply or swap
@@ -484,6 +484,8 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                 if(i.mult.rm == PC || i.mult.rs == PC
                         || i.mult.rn == PC || i.mult.rd == PC)
                     goto unimpl; // PC as register not implemented
+
+                emit_save_state();
 
                 Instruction translated;
                 translated.raw = i.raw;
@@ -562,6 +564,8 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                     || i.mem_proc2.rd == PC)
                 goto unimpl; // PC as operand or dest. not implemented
 
+            emit_save_state();
+
             // Load base into r0
             emit_ldr_armreg(R0, i.mem_proc2.rn);
 
@@ -615,7 +619,6 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                 if(i.bx.rm == PC)
                     goto unimpl;
 
-<<<<<<< HEAD:core/translate_arm.cpp
                 emit_save_state();
                 if(i.bx.l)
                 {
@@ -945,6 +948,7 @@ void flush_translations()
     next_translation_index = 0;
     translate_current = translate_buffer;
     jump_table_current = jump_table;
+    map_table_current = map_table;
 }
 
 void invalidate_translation(int index)
