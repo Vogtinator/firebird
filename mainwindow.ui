@@ -338,8 +338,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>271</width>
-             <height>98</height>
+             <width>267</width>
+             <height>104</height>
             </rect>
            </property>
            <attribute name="label">
@@ -447,7 +447,7 @@
              <x>0</x>
              <y>0</y>
              <width>263</width>
-             <height>78</height>
+             <height>82</height>
             </rect>
            </property>
            <attribute name="label">
@@ -540,7 +540,7 @@
              <x>0</x>
              <y>0</y>
              <width>326</width>
-             <height>123</height>
+             <height>111</height>
             </rect>
            </property>
            <attribute name="label">
@@ -667,8 +667,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>157</width>
-             <height>40</height>
+             <width>156</width>
+             <height>42</height>
             </rect>
            </property>
            <attribute name="label">
@@ -692,8 +692,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>148</width>
-             <height>76</height>
+             <width>149</width>
+             <height>80</height>
             </rect>
            </property>
            <attribute name="label">
@@ -750,6 +750,16 @@
            </layout>
           </widget>
          </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tabCPU">
+       <attribute name="title">
+        <string>CPU State</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_10">
+        <item>
+         <widget class="CPUView" name="widget" native="true"/>
         </item>
        </layout>
       </widget>
@@ -832,7 +842,7 @@
      <x>0</x>
      <y>0</y>
      <width>714</width>
-     <height>19</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuEmulation">
@@ -1063,6 +1073,12 @@
    <class>USBLinkTreeWidget</class>
    <extends>QTreeWidget</extends>
    <header>usblinktreewidget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>CPUView</class>
+   <extends>QWidget</extends>
+   <header>cpuview.h</header>
+   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources>
