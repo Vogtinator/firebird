@@ -759,7 +759,7 @@
        </attribute>
        <layout class="QHBoxLayout" name="horizontalLayout_10">
         <item>
-         <widget class="CPUView" name="widget" native="true"/>
+         <widget class="CPUView" name="widget"/>
         </item>
        </layout>
       </widget>
