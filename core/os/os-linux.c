@@ -72,8 +72,12 @@ void *os_alloc_executable(size_t size)
     FILE *f = fopen("/bin/bash", "r"); // will succeed on jailbroken only
     if (errno == ENOENT)
     {
+        // Can't use JIT
         fclose(f);
         return NULL;
+    } else {
+        // OK, let mmap return the address
+        fclose(f);
     }
 #endif
     
