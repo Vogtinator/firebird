@@ -9,6 +9,7 @@
 #ifdef __APPLE__
 #include <mach/clock.h>
 #include <mach/mach.h>
+#include <errno.h>
 #endif
 
 #include "os.h"
@@ -67,6 +68,15 @@ void os_sparse_decommit(void *page, size_t size)
 
 void *os_alloc_executable(size_t size)
 {
+#ifdef IS_IOS_BUILD
+    FILE *f = fopen("/bin/bash", "r"); // will succeed on jailbroken only
+    if (errno == ENOENT)
+    {
+        fclose(f);
+        return NULL;
+    }
+#endif
+    
 #if defined(__i386__) || defined(__x86_64__)
     // Has to be in 32-bit space for the JIT
     void *ptr = mmap((void*)0x30000000, size, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_SHARED|MAP_ANON, -1, 0);
