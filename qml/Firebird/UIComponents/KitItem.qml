@@ -12,6 +12,7 @@ ColumnLayout {
             id: label
             font.bold: true
 
+            font.family: "system"
             text: "Name"
         }
 
@@ -21,6 +22,7 @@ ColumnLayout {
             horizontalAlignment: Text.AlignRight
             Layout.leftMargin: 10
 
+            font.family: "system"
             text: "CX CAS (HW J)"
         }*/
     }
@@ -37,6 +39,7 @@ ColumnLayout {
             horizontalAlignment: Text.AlignRight
             Layout.leftMargin: 10
 
+            font.family: "system"
             text: "state"
         }
     }
