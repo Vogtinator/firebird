@@ -12,6 +12,7 @@ ColumnLayout {
             id: label
             font.bold: true
 
+            font.family: "system"
             text: "Name"
         }
 
