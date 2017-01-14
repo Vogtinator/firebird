@@ -302,14 +302,26 @@ bool unknown_cx_suspend(emu_snapshot *snapshot)
 }
 
 /* 90040000: SPI? */
+static unknown_cx_w_state unknown_cx_w;
+
 uint32_t unknown_cx_w_read(uint32_t addr) {
     if ((features & FEATURE_HWW) == 0)
         return 0;
 
     switch (addr & 0xFF)
     {
-    case 0xC:
-        return 0x6;
+    case 0x08:
+    {
+        unknown_cx_w.state = 0;
+        if(unknown_cx_w.addr == 0x1ff)
+            return 0x85 << 1;
+        static int i = 0;
+        return i++;
+    }
+    case 0x0C:
+    {
+        return unknown_cx_w.state | 0x2;
+    }
     default:
         return 0;
     }
@@ -320,10 +332,28 @@ void unknown_cx_w_write(uint32_t addr, uint32_t value) {
 
     switch (addr & 0xFF)
     {
+    case 0x08:
+        unknown_cx_w.addr = value;
+        gui_debug_printf("W 0x%x\n", value);
+        unknown_cx_w.state |= 0x4;
+
+        break;
     default:
         (void) value;
         break;
     }
+}
+
+bool unknown_cx_w_resume(const emu_snapshot *snapshot)
+{
+    unknown_cx_w = snapshot->mem.unknown_cx_w;
+    return true;
+}
+
+bool unknown_cx_w_suspend(emu_snapshot *snapshot)
+{
+    snapshot->mem.unknown_cx_w = unknown_cx_w;
+    return true;
 }
 
 /* 90060000 */
@@ -637,7 +667,7 @@ uint32_t timer_cx_read(uint32_t addr) {
         case 0x0010: case 0x0030: return t->interrupt;
         case 0x0014: case 0x0034: return t->interrupt & t->control >> 5;
         case 0x0018: case 0x0038: return t->load;
-        case 0x001C: case 0x003C: return 0; //?
+        case 0x001C: case 0x003C: return (t->control & 0x80) ? 0x4 : 0 ; //?
         case 0x0FE0: return 0x04;
         case 0x0FE4: return 0x18;
         case 0x0FE8: return 0x14;
@@ -693,11 +723,48 @@ void timer_cx_advance(int which) {
         }
     }
 }
+void timer_cx_fast_advance() {
+    int i;
+    for (i = 0; i < 2; i++) {
+        struct cx_timer *t = &timer_cx.timer[0][i];
+        t->prescale++;
+        if (!(t->control & 0x80))
+            continue;
+        uint32_t oldvalue = (t->control & 2) ? t->value : t->value & 0xFFFF;
+        uint32_t value = oldvalue;
+        if (t->reload) {
+            t->reload = 0;
+            value = t->load;
+        } else if (!(t->prescale & ((1 << (t->control & 0xC)) - 1))) {
+            if (value == 0) {
+                if (!(t->control & 1)) {
+                    if(value < 703)
+                        value = 0;
+                    else
+                        value -= 703;
+                    if (t->control & 0x40)
+                        value = t->load;
+                }
+            } else {
+                if(value < 703)
+                    value = 0;
+                else
+                    value -= 703;
+            }
+        }
+        t->value = (t->control & 2) ? value : (t->value & 0xFFFF0000) | (value & 0xFFFF);
+        if (oldvalue != 0 && value == 0) {
+            t->interrupt = 1;
+            timer_cx_int_check(0);
+        }
+    }
+}
 static void timer_cx_event(int index) {
     // TODO: should use seperate schedule item for each timer,
     //       only fired on significant events
     event_repeat(index, 1);
-    // fast timer not implemented here...
+
+    timer_cx_fast_advance();
     timer_cx_advance(1);
     timer_cx_advance(2);
 }

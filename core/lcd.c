@@ -79,8 +79,9 @@ void lcd_cx_w_draw_frame(uint16_t *buffer)
         for (int col = 0; col < 320; ++col)
         {
             uint16_t *out = buffer + col;
-            for(int row = 0; row < 240; ++row, out += 320)
-                *out = *in++;
+            for(int row = 239; row >= 0; --row, out += 320)
+                *out = *(in + row);
+            in += 240;
         }
     }
     else if(mode == 4)

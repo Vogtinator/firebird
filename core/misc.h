@@ -110,6 +110,13 @@ bool unknown_cx_resume(const emu_snapshot *snapshot);
 uint32_t unknown_cx_read(uint32_t addr);
 void unknown_cx_write(uint32_t addr, uint32_t value);
 
+typedef struct unknown_cx_w_state {
+    uint32_t state;
+    uint16_t addr;
+} unknown_cx_w_state;
+
+bool unknown_cx_w_suspend(emu_snapshot *snapshot);
+bool unknown_cx_w_resume(const emu_snapshot *snapshot);
 uint32_t unknown_cx_w_read(uint32_t addr);
 void unknown_cx_w_write(uint32_t addr, uint32_t value);
 
