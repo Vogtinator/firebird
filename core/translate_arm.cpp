@@ -1,6 +1,7 @@
 /*
  * How the ARM translation works:
  * translation_enter in asmcode_arm.S finds the entry point and jumps to it.
+ * Some virtual registers are mapped to physical ones and those have to be loaded as well.
  * r10 in translation mode points to the global arm_state and r11 has a copy of
  * cpsr_nzcv that is updated after every virtual instruction if it changes the
  * flags. After returning from translation mode because either a branch was
@@ -79,6 +80,143 @@ static void emit_str_armreg(const unsigned int rd, const unsigned int r_virt)
     emit_al(0x58a0000 | (rd << 12) | (r_virt << 2)); // str rd, [r10, #2*r_virt]
 }
 
+// Register allocation: Registers are dynamically reused
+enum Reg : uint8_t {
+    R0=0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11,R12,SP,LR,PC,
+    Invalid=16,Dirty=128
+};
+
+static const int first_map_reg = R4,
+                    last_map_reg = R9;
+
+// Maps virtual register to physical register (or invalid) and a dirty-flag
+// PC is never mapped
+static unsigned int regmap[15];
+
+// Maps physical register to virtual register, mustn't contain anything > 0x10
+// 0 means not mapped, 1 means R0 and so on. This makes it possible to optimize load_state in asmcode_arm.S
+// Only mapreg[first_map_reg] until mapreg[last_map_reg] are valid entries
+static unsigned mapreg[15];
+
+// The next available physical register
+static unsigned int current_reg = first_map_reg;
+
+// Physical registers that must not be unmapped
+static const int MAX_USED_REGS = 4;
+static unsigned int used_regs[MAX_USED_REGS];
+
+// How many regs are currently used and must not be unmapped
+static unsigned int current_used_regs_count = 0;
+
+static void map_reset()
+{
+    std::fill(regmap, regmap + 15, Invalid);
+    current_used_regs_count = 0;
+    current_reg = first_map_reg;
+    std::fill(mapreg, mapreg + 15, 0);
+}
+
+// Marks a reg as needed. It won't be unmapped until the next instruction
+static int map_need(unsigned int reg)
+{
+    assert(current_used_regs_count < MAX_USED_REGS);
+    used_regs[current_used_regs_count++] = reg;
+    return reg;
+}
+
+// Whether the physical register reg is needed
+static bool reg_used(unsigned int reg)
+{
+    if(current_used_regs_count == 0)
+        return false;
+
+    for(unsigned int i = 0; i < current_used_regs_count; ++i)
+        if(used_regs[i] == reg)
+            return true;
+
+    return false;
+}
+
+// Updates current_reg to point to an unneeded one
+static void next_reg()
+{
+    do
+    {
+        if(current_reg == last_map_reg)
+            current_reg = first_map_reg;
+        else
+            ++current_reg;
+    }
+    while(reg_used(current_reg));
+}
+
+// Flushed reg_phys into arm if needed and invalidates the map entriy
+static void unmap_reg(unsigned int reg_phys)
+{
+    unsigned int oldvirt = mapreg[reg_phys];
+    // Mapped?
+    if(oldvirt == 0)
+        return;
+
+    // See encoding of mapreg above
+    oldvirt -= 1;
+
+    // Save register value
+    if(regmap[oldvirt] & Dirty)
+        emit_str_armreg(current_reg, oldvirt);
+
+    // Invalidate map entry
+    regmap[oldvirt] = Invalid;
+}
+
+static int map_reg(unsigned int reg_virt, bool write)
+{
+    assert(reg_virt <= 14); // Must not happen: PC (15) not implemented and any higher nr is invalid
+
+    // Already mapped?
+    if(regmap[reg_virt] != Invalid)
+    {
+        if(write)
+            regmap[reg_virt] |= Dirty;
+        return regmap[reg_virt] & 0xF; // Mask out the dirty bit
+    }
+
+    // Adjust current_reg to point to an unused one
+    next_reg();
+
+    // Reg not loaded, reuse register: Remove old mapping first
+    unmap_reg(current_reg);
+
+    // Set map entry and load value
+    mapreg[current_reg] = reg_virt + 1;
+    if(write)
+        regmap[reg_virt] = current_reg | Dirty;
+    else
+    {
+        // Load reg from memory
+        emit_ldr_armreg(current_reg, reg_virt);
+        regmap[reg_virt] = current_reg;
+    }
+
+    return current_reg;
+}
+
+// The reg is marked as dirty
+// Return value: Register number the reg has been mapped to
+static int map_save_reg(unsigned int reg)
+{
+    int ret = map_reg(reg, true);
+    return map_need(ret);
+}
+
+// The current value is loaded, if not mapped yet
+// Return value: Register number the reg has been loaded into
+static int map_load_reg(unsigned int reg)
+{
+    int ret = map_reg(reg, false);
+    return map_need(ret);
+}
+
 // Load and store flags from r11
 static void emit_ldr_flags()
 {
@@ -95,8 +233,39 @@ static void emit_str_flags()
     // r11 is written to arm.cpsr_flags in translation_next and the memory access helpers in asmcode_arm.S
 }
 
-// Sets rd to imm
-static void emit_mov(int rd, uint32_t imm)
+static bool flags_loaded = false, flags_changed = false;
+
+static void need_flags()
+{
+    if(flags_loaded)
+        return;
+
+    emit_ldr_flags();
+    flags_loaded = true;
+}
+
+static void changed_flags()
+{
+    flags_changed = true;
+}
+
+static void flush_flags()
+{
+    if(!flags_loaded || !flags_changed)
+        return;
+
+    emit_str_flags();
+    flags_loaded = flags_changed = false;
+}
+
+// Sets phys. rd to phys. rn
+static void emit_mov_reg(unsigned int rd, unsigned int rn)
+{
+    emit_al(0x1a00000 | (rd << 12) | rn);
+}
+
+// Sets phys. rd to imm
+static void emit_mov_imm(unsigned int rd, uint32_t imm)
 {
     // movw/movt only available on >= armv7
     #if defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__)
@@ -117,7 +286,7 @@ static void emit_mov(int rd, uint32_t imm)
     #endif
 }
 
-// Returns 0 if target not reachable
+// Returns 0 if target not reachable or a branch instruction
 static uint32_t maybe_branch(void *target)
 {
     #ifdef REL_BRANCH
@@ -144,9 +313,41 @@ static void emit_jmp(void *target)
     emit(reinterpret_cast<uintptr_t>(target));
 }
 
+// Flush all mapped regs back into arm.reg[]
+static void emit_flush_regs()
+{
+    for(unsigned int i = first_map_reg; i <= last_map_reg; ++i)
+    {
+        unsigned int virt = mapreg[i];
+        if(!virt) // Not mapped
+            continue;
+
+        // See encoding of mapreg above
+        virt -= 1;
+
+        unsigned int phys = regmap[virt];
+        if(phys & Dirty)
+            emit_str_armreg(phys & 0xF, virt);
+
+        regmap[virt] = Invalid;
+        mapreg[i] = 0;
+    }
+}
+
+// Flush all regs into the global arm_state struct
+// Has to be called before anything that might cause a translation leave!
+static void emit_save_state()
+{
+    flush_flags();
+    emit_flush_regs();
+}
+
 // Registers r0-r3 and r12 are not preserved!
 static void emit_call(void *target)
 {
+    if(save)
+        emit_save_state();
+
     uint32_t branch = maybe_branch(target);
     if(branch)
         return emit_al(branch | (1 << 24)); // Set the L-bit
@@ -175,9 +376,11 @@ bool translate_init()
     if(translate_buffer)
         return true;
 
+    map_reset();
     translate_current = translate_buffer = reinterpret_cast<uint32_t*>(os_alloc_executable(INSN_BUFFER_SIZE));
     translate_end = translate_current + INSN_BUFFER_SIZE/sizeof(*translate_buffer);
     jump_table_current = jump_table;
+    map_table_current = map_table;
     next_translation_index = 0;
 
     return !!translate_buffer;
@@ -229,11 +432,20 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
         if(stop_here
             || translate_current + 0x200 > translate_end
             || RAM_FLAGS(insn_ptr) & (RF_EXEC_BREAKPOINT | RF_EXEC_DEBUG_NEXT | RF_EXEC_HACK | RF_CODE_TRANSLATED | RF_CODE_NO_TRANSLATE)
-            || (pc ^ pc_start) & ~0x3ff)
+            || (pc ^ pc_start) & ~0xfff)
             goto exit_translation;
 
         Instruction i;
         uint32_t insn = i.raw = *insn_ptr;
+
+        // It may be that some reg mappings are flushed into memory,
+        // but skipped. So flush everything now.
+        // As translate_buffer_inst_start is set after this, emit_save_state counts as the last instruction
+        if(i.cond != CC_AL)
+            emit_save_state();
+
+        // Right now no regs are needed
+        current_used_regs_count = 0;
 
         // Rollback translate_current to this val if instruction not supported
         *jump_table_current = translate_buffer_inst_start = translate_current;
@@ -245,7 +457,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
         // after_inst: @ next instruction
         if(i.cond != CC_AL && i.cond != CC_NV)
         {
-            emit_ldr_flags();
+            need_flags();
             cond_branch = translate_current;
             emit(0x0a000000 | ((i.cond ^ 1) << 28));
         }
@@ -479,31 +691,47 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
             // Only change the destination register if it has one
             if(i.data_proc.op < OP_TST || i.data_proc.op > OP_CMN)
-                translated.data_proc.rd = R3;
+            {
+                if(i.data_proc.rd != PC)
+                    translated.data_proc.rd = map_save_reg(i.data_proc.rd);
+                else
+                    translated.data_proc.rd = R0; // R0 is first arg to translation_next
+            }
 
             if(unlikely(setcc
                         || i.data_proc.op == OP_ADC
                         || i.data_proc.op == OP_SBC
                         || i.data_proc.op == OP_RSC
-                        || i.data_proc.shift == SH_ROR)) // ROR with #0 as imm is RRX
+                        || (!i.data_proc.reg_shift && i.data_proc.shift == SH_ROR))) // ROR with #0 as imm is RRX (not everything checked)
             {
                 // This instruction impacts the flags, load them...
-                emit_ldr_flags();
+                need_flags();
 
                 // Emit the instruction itself
                 emit(translated.raw);
 
-                // ... and store them again
-                emit_str_flags();
+                // ... and store them again if modified
+                if(setcc || (!i.data_proc.reg_shift && i.data_proc.shift == SH_ROR))
+                    changed_flags();
             }
             else
                 emit(translated.raw);
 
             if(i.data_proc.op < OP_TST || i.data_proc.op > OP_CMN)
+            {
                 emit_str_armreg(R3, i.data_proc.rd);
+
+                // Jump to destination
+                if(i.data_proc.rd == PC)
+                {
+                    // We're going to leave the translation, flush regs
+                    emit_save_state();
+                    emit_jmp(reinterpret_cast<void*>(translation_next));
+                }
+            }
         }
         else if((insn & 0xC000000) == 0x4000000)
-        {
+        {goto unimpl;
             // Memory access: LDR, STRB, etc.
 
             // User mode access not implemented
@@ -608,6 +836,14 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                 emit_call(reinterpret_cast<void*>(i.mem_proc.b ? read_byte_asm : read_word_asm));
                 if(i.mem_proc.rd != PC)
                     emit_str_armreg(R0, i.mem_proc.rd); // r0 is return value
+                else
+                {
+                    //TODO: Fix this
+                    goto unimpl;
+                    // pc is destination register
+                    emit_save_state();
+                    emit_jmp(reinterpret_cast<void*>(translation_next));
+                }
             }
             else
             {
@@ -731,10 +967,14 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
              * Either jump to translation_next if code not translated (yet) or
              * jump directly to the translated code, over a small function checking for pending events */
 
+            // We're going to jump somewhere else
+            // No register mapping after this
+            emit_save_state();
+
             if(i.branch.l)
             {
                 // Save return address in LR
-                emit_mov(R0, pc + 4);
+                emit_mov_imm(R0, pc + 4);
                 emit_str_armreg(R0, LR);
             }
             else if(i.cond == CC_EQ)
@@ -749,7 +989,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             if((entry & AC_FLAGS) || !(RAM_FLAGS(ptr) & RF_CODE_TRANSLATED))
             {
                 // Not translated, use translation_next
-                emit_mov(R0, addr);
+                emit_mov_imm(R0, addr);
                 emit_jmp(reinterpret_cast<void*>(translation_next));
             }
             else
@@ -759,9 +999,9 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                 uintptr_t jmp_target = reinterpret_cast<uintptr_t>(target_translation->jump_table[ptr - target_translation->start_ptr]);
 
                 // Update pc first
-                emit_mov(R0, addr);
+                emit_mov_imm(R0, addr);
                 emit_str_armreg(R0, PC);
-                emit_mov(R0, jmp_target);
+                emit_mov_imm(R0, jmp_target);
                 emit_jmp(reinterpret_cast<void*>(translation_jmp));
             }
         }
@@ -769,9 +1009,12 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             goto unimpl;
 
         instruction_translated:
-
         if(cond_branch)
         {
+            // The mappings that happened during the execution may have been skipped
+            // so they can't be used.
+            emit_save_state();
+
             // Fixup the branch above (-2 to account for the pipeline)
             *cond_branch |= (translate_current - cond_branch - 2) & 0xFFFFFF;
             cond_branch = nullptr;
@@ -779,6 +1022,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
         RAM_FLAGS(insn_ptr) |= (RF_CODE_TRANSLATED | next_translation_index << RFS_TRANSLATION_INDEX);
         ++jump_table_current;
+        ++map_table_current;
         ++insn_ptr;
         pc += 4;
     }
@@ -789,7 +1033,8 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
     RAM_FLAGS(insn_ptr) |= RF_CODE_NO_TRANSLATE;
 
     exit_translation:
-    emit_mov(0, pc);
+    emit_save_state();
+    emit_mov_imm(0, pc);
     emit_jmp(reinterpret_cast<void*>(translation_next));
 
     #ifdef IS_IOS_BUILD
@@ -853,3 +1098,4 @@ void translate_fix_pc()
     // Not implemented: Get accurate pc back in arm.reg[15]
     assert(false);
 }
+-
