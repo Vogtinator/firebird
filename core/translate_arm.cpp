@@ -223,10 +223,6 @@ static void emit_ldr_flags()
     emit_al(0x128f00b); // msr cpsr_f, r11
 }
 
-enum Reg : uint8_t {
-    R0 = 0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, SP, LR, PC
-};
-
 static void emit_str_flags()
 {
     emit_al(0x10fb000); // mrs r11, cpsr_f
@@ -265,7 +261,7 @@ static void emit_mov_reg(unsigned int rd, unsigned int rn)
 }
 
 // Sets phys. rd to imm
-static void emit_mov_imm(unsigned int rd, uint32_t imm)
+static void emit_mov(unsigned int rd, uint32_t imm)
 {
     // movw/movt only available on >= armv7
     #if defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__)
@@ -345,8 +341,7 @@ static void emit_save_state()
 // Registers r0-r3 and r12 are not preserved!
 static void emit_call(void *target)
 {
-    if(save)
-        emit_save_state();
+    emit_save_state();
 
     uint32_t branch = maybe_branch(target);
     if(branch)
@@ -380,7 +375,6 @@ bool translate_init()
     translate_current = translate_buffer = reinterpret_cast<uint32_t*>(os_alloc_executable(INSN_BUFFER_SIZE));
     translate_end = translate_current + INSN_BUFFER_SIZE/sizeof(*translate_buffer);
     jump_table_current = jump_table;
-    map_table_current = map_table;
     next_translation_index = 0;
 
     return !!translate_buffer;
@@ -974,7 +968,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             if(i.branch.l)
             {
                 // Save return address in LR
-                emit_mov_imm(R0, pc + 4);
+                emit_mov(R0, pc + 4);
                 emit_str_armreg(R0, LR);
             }
             else if(i.cond == CC_EQ)
@@ -989,7 +983,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             if((entry & AC_FLAGS) || !(RAM_FLAGS(ptr) & RF_CODE_TRANSLATED))
             {
                 // Not translated, use translation_next
-                emit_mov_imm(R0, addr);
+                emit_mov(R0, addr);
                 emit_jmp(reinterpret_cast<void*>(translation_next));
             }
             else
@@ -999,9 +993,9 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                 uintptr_t jmp_target = reinterpret_cast<uintptr_t>(target_translation->jump_table[ptr - target_translation->start_ptr]);
 
                 // Update pc first
-                emit_mov_imm(R0, addr);
+                emit_mov(R0, addr);
                 emit_str_armreg(R0, PC);
-                emit_mov_imm(R0, jmp_target);
+                emit_mov(R0, jmp_target);
                 emit_jmp(reinterpret_cast<void*>(translation_jmp));
             }
         }
@@ -1022,7 +1016,6 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
         RAM_FLAGS(insn_ptr) |= (RF_CODE_TRANSLATED | next_translation_index << RFS_TRANSLATION_INDEX);
         ++jump_table_current;
-        ++map_table_current;
         ++insn_ptr;
         pc += 4;
     }
@@ -1033,9 +1026,6 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
     RAM_FLAGS(insn_ptr) |= RF_CODE_NO_TRANSLATE;
 
     exit_translation:
-    emit_save_state();
-    emit_mov_imm(0, pc);
-    emit_jmp(reinterpret_cast<void*>(translation_next));
 
     #ifdef IS_IOS_BUILD
         // Mark translate_buffer as R_X
@@ -1046,6 +1036,10 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
     // Did we do any translation at all?
     if(insn_ptr == insn_ptr_start)
         return;
+
+    emit_save_state();
+    emit_mov(0, pc);
+    emit_jmp(reinterpret_cast<void*>(translation_next));
 
     this_translation->end_ptr = insn_ptr;
     // This effectively flushes this_translation, as it won't get used next time
@@ -1098,4 +1092,4 @@ void translate_fix_pc()
     // Not implemented: Get accurate pc back in arm.reg[15]
     assert(false);
 }
--
+
