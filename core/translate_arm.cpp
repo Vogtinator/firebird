@@ -426,7 +426,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
         if(stop_here
             || translate_current + 0x200 > translate_end
             || RAM_FLAGS(insn_ptr) & (RF_EXEC_BREAKPOINT | RF_EXEC_DEBUG_NEXT | RF_EXEC_HACK | RF_CODE_TRANSLATED | RF_CODE_NO_TRANSLATE)
-            || (pc ^ pc_start) & ~0xfff)
+            || (pc ^ pc_start) & ~0x3ff)
             goto exit_translation;
 
         Instruction i;
@@ -440,6 +440,19 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
         // Right now no regs are needed
         current_used_regs_count = 0;
+
+        bool can_jump_here = true;
+
+        if(flags_changed)
+            can_jump_here = false;
+        else for(int i = first_map_reg; i <= last_map_reg; ++i)
+        {
+            if(mapreg[i] != 0)
+            {
+                can_jump_here = false;
+                break;
+            }
+        }
 
         // Rollback translate_current to this val if instruction not supported
         *jump_table_current = translate_buffer_inst_start = translate_current;
@@ -725,7 +738,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             }
         }
         else if((insn & 0xC000000) == 0x4000000)
-        {goto unimpl;
+        {
             // Memory access: LDR, STRB, etc.
 
             // User mode access not implemented
@@ -1014,8 +1027,12 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             cond_branch = nullptr;
         }
 
-        RAM_FLAGS(insn_ptr) |= (RF_CODE_TRANSLATED | next_translation_index << RFS_TRANSLATION_INDEX);
-        ++jump_table_current;
+        if(can_jump_here)
+        {
+            RAM_FLAGS(insn_ptr) |= (RF_CODE_TRANSLATED | next_translation_index << RFS_TRANSLATION_INDEX);
+            ++jump_table_current;
+        }
+
         ++insn_ptr;
         pc += 4;
     }

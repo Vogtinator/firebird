@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 struct translation {
-    uint32_t* map_table;
+    uintptr_t unused;
     void** jump_table;
     uint32_t *start_ptr;
     uint32_t *end_ptr;

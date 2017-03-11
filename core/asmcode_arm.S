@@ -143,9 +143,7 @@ translation_next_enter:
     str     r5, [r6]
 
     sub     r0, r0, r3 // r0 = pc_ptr - start_ptr
-    ldr     r0, [r2, r0] // load jump_table[r0]
-    msr     cpsr_f, r11 // Flags have to be loaded
-    bx      r0
+    ldr     pc, [r2, r0] // jump to jump_table[r0]
 
 to_thumb:
     sub     r0, r0, #1
@@ -179,8 +177,7 @@ translation_jmp: .global translation_jmp
     cmp     r2, #0
     bpl     save_return
 
-    msr     cpsr_f, r11 // Flags have to be loaded
-    bx      r0
+    bx      r0 // Jump to the target
 
 // Save flags and leave, arm.reg[15] must be set already!
 save_return:
