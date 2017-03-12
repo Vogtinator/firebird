@@ -28,8 +28,8 @@ translation_pc_ptr: .global translation_pc_ptr
 
 #ifdef __clang__
 /* On iOS, .text relocations are permitted and due to
-   a bug it's unable to handle to handle our way of
-   avoiding them anyway... */
+   a bug it's unable to handle our way of avoiding them
+   anyway... */
 
 .macro sym name, no=1
 .endm
@@ -159,12 +159,13 @@ return:
 
 // Invoked from within translated code to jump to other, already translated code
 // Target address of translated code is in r0 - only r10 and r11 have to be preserved
+// Target PC is in r1 and will be written to arm.reg[15]
 // This is used to check for events and leave the translation to process them.
-// arm.reg[15] must be set already!
 translation_jmp: .global translation_jmp
+    str     r1, [r10, #15*4] // arm.reg[15] = r1
+
     /* For now the cpu_events check is commented out. This is a very critical section of code here,
        having a high impact on performance. To increase accuracy, uncomment the block below.
-
     loadsym r1, cpu_events, 2
     ldr     r2, [r1]
     cmp     r2, #0

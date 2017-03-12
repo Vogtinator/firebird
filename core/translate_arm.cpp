@@ -1,7 +1,6 @@
 /*
  * How the ARM translation works:
  * translation_enter in asmcode_arm.S finds the entry point and jumps to it.
- * Some virtual registers are mapped to physical ones and those have to be loaded as well.
  * r10 in translation mode points to the global arm_state and r11 has a copy of
  * cpsr_nzcv that is updated after every virtual instruction if it changes the
  * flags. After returning from translation mode because either a branch was
@@ -298,8 +297,11 @@ static uint32_t maybe_branch(void *target)
     #endif
 }
 
-static void emit_jmp(void *target)
+static void emit_jmp(void *target, bool save = true)
 {
+    if(save)
+        emit_save_state();
+
     uint32_t branch = maybe_branch(target);
     if(branch)
         return emit_al(branch);
@@ -418,8 +420,6 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
     this_translation->start_ptr = insn_ptr_start;
 
     // This loop is executed once per instruction.
-    // Due to the CPU being able to jump to each instruction seperately,
-    // there is no state preserved between (virtual) instructions.
     while(1)
     {
         // Translate further?
@@ -432,18 +432,12 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
         Instruction i;
         uint32_t insn = i.raw = *insn_ptr;
 
-        // It may be that some reg mappings are flushed into memory,
-        // but skipped. So flush everything now.
-        // As translate_buffer_inst_start is set after this, emit_save_state counts as the last instruction
-        if(i.cond != CC_AL)
-            emit_save_state();
-
         // Right now no regs are needed
         current_used_regs_count = 0;
 
         bool can_jump_here = true;
 
-        if(flags_changed)
+        if(flags_changed || flags_loaded)
             can_jump_here = false;
         else for(int i = first_map_reg; i <= last_map_reg; ++i)
         {
@@ -460,10 +454,15 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
         // Conditional instructions are translated like this:
         // msr cpsr_f, r11
         // b<cc> after_inst
-        // <instruction>
+        // <translated instruction>
         // after_inst: @ next instruction
         if(i.cond != CC_AL && i.cond != CC_NV)
         {
+            // It may be that some reg mappings are flushed into memory,
+            // but skipped. So flush everything now.
+            // As translate_buffer_inst_start is set after this, emit_save_state counts as the last instruction
+            emit_save_state();
+
             need_flags();
             cond_branch = translate_current;
             emit(0x0a000000 | ((i.cond ^ 1) << 28));
@@ -540,9 +539,9 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
                 if(i.mult.s)
                 {
-                    emit_ldr_flags();
+                    need_flags();
                     emit(translated.raw);
-                    emit_str_flags();
+                    flags_changed();
                 }
                 else
                     emit(translated.raw);
@@ -730,15 +729,11 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
                 // Jump to destination
                 if(i.data_proc.rd == PC)
-                {
-                    // We're going to leave the translation, flush regs
-                    emit_save_state();
                     emit_jmp(reinterpret_cast<void*>(translation_next));
-                }
             }
         }
         else if((insn & 0xC000000) == 0x4000000)
-        {goto unimpl;
+        {goto unimpl; // Uses R5
             // Memory access: LDR, STRB, etc.
 
             // User mode access not implemented
@@ -848,7 +843,6 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                     //TODO: Fix this
                     goto unimpl;
                     // pc is destination register
-                    emit_save_state();
                     emit_jmp(reinterpret_cast<void*>(translation_next));
                 }
             }
@@ -877,7 +871,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             }
         }
         else if((insn & 0xE000000) == 0x8000000)
-        {
+        {goto unimpl; // Uses r4
             if(i.mem_multi.s)
                 goto unimpl; // Exception return or usermode not implemented
 
@@ -997,7 +991,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             {
                 // Not translated, use translation_next
                 emit_mov(R0, addr);
-                emit_jmp(reinterpret_cast<void*>(translation_next));
+                emit_jmp(reinterpret_cast<void*>(translation_next), false);
             }
             else
             {
@@ -1005,11 +999,9 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
                 translation *target_translation = &translation_table[RAM_FLAGS(ptr) >> RFS_TRANSLATION_INDEX];
                 uintptr_t jmp_target = reinterpret_cast<uintptr_t>(target_translation->jump_table[ptr - target_translation->start_ptr]);
 
-                // Update pc first
-                emit_mov(R0, addr);
-                emit_str_armreg(R0, PC);
                 emit_mov(R0, jmp_target);
-                emit_jmp(reinterpret_cast<void*>(translation_jmp));
+                emit_mov(R1, addr);
+                emit_jmp(reinterpret_cast<void*>(translation_jmp), false);
             }
         }
         else
@@ -1051,7 +1043,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
     #endif
     
     emit_save_state();
-    emit_mov(0, pc);
+    emit_mov(R0, pc);
     emit_jmp(reinterpret_cast<void*>(translation_next));
 
     // Did we do any translation at all?
