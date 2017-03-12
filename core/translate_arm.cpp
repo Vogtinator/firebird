@@ -726,7 +726,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
             if(i.data_proc.op < OP_TST || i.data_proc.op > OP_CMN)
             {
-                emit_str_armreg(R3, i.data_proc.rd);
+                emit_str_armreg(translated.data_proc.rd, i.data_proc.rd);
 
                 // Jump to destination
                 if(i.data_proc.rd == PC)
@@ -738,7 +738,7 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
             }
         }
         else if((insn & 0xC000000) == 0x4000000)
-        {
+        {goto unimpl;
             // Memory access: LDR, STRB, etc.
 
             // User mode access not implemented
@@ -1050,13 +1050,13 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
         mprotect(translate_buffer, INSN_BUFFER_SIZE, PROT_READ | PROT_EXEC);
     #endif
     
-    // Did we do any translation at all?
-    if(insn_ptr == insn_ptr_start)
-        return;
-
     emit_save_state();
     emit_mov(0, pc);
     emit_jmp(reinterpret_cast<void*>(translation_next));
+
+    // Did we do any translation at all?
+    if(insn_ptr == insn_ptr_start)
+        return;
 
     this_translation->end_ptr = insn_ptr;
     // This effectively flushes this_translation, as it won't get used next time
