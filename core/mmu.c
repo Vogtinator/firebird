@@ -229,24 +229,10 @@ void *addr_cache_miss(uint32_t virt, bool writing, fault_proc *fault) {
     ac_entry entry;
     uintptr_t phys = mmu_translate(virt, writing, fault, NULL);
     uint8_t *ptr = phys_mem_ptr(phys, 1);
-    if (ptr && !(writing && (RAM_FLAGS((size_t)ptr & ~3) & RF_READ_ONLY))) {
-        AC_SET_ENTRY_PTR(entry, virt, ptr)
-                //printf("addr_cache_miss VA=%08x ptr=%p entry=%p\n", virt, ptr, entry);
-    } else {
-        AC_SET_ENTRY_PHYS(entry, virt, phys)
-                //printf("addr_cache_miss VA=%08x PA=%08x entry=%p\n", virt, phys, entry);
-    }
-    uint32_t oldoffset = ac_valid_list[ac_valid_index];
-    uint32_t offset = (virt >> 10) * 2 + writing;
-    //if (ac_commit_map[oldoffset / (AC_PAGE_SIZE / sizeof(ac_entry))])
-    addr_cache_invalidate(oldoffset);
-    addr_cache[offset] = entry;
-    ac_valid_list[ac_valid_index] = offset;
-    ac_valid_index = (ac_valid_index + 1) % AC_VALID_MAX;
     return ptr;
 }
 
-void addr_cache_flush() {
+void addr_cache_flush() {return;
     uint32_t i;
 
     if (arm.control & 1) {

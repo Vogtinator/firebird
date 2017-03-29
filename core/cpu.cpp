@@ -182,36 +182,7 @@ void *try_ptr(uint32_t addr)
 
 void * FASTCALL read_instruction(uint32_t addr)
 {
-    //There are two different addr_cache formats...
-#ifdef AC_FLAGS
-    uintptr_t entry = *(uintptr_t*)(addr_cache + ((addr >> 10) << 1));
-
-    if(unlikely(entry & AC_FLAGS))
-    {
-        if(entry & AC_INVALID)
-        {
-            addr_cache_miss(addr, false, prefetch_abort);
-            return read_instruction(addr);
-        }
-        else // Executing MMIO stuff
-        {
-            warn("PC in MMIO range: 0x%x\n", addr);
-            return 0;
-        }
-    }
-
-    entry += addr;
-    return (void*)entry;
-#else
-    void *ptr = &addr_cache[(addr >> 10) << 1][addr];
-    if(unlikely((uintptr_t)ptr & AC_NOT_PTR))
-    {
-        ptr = addr_cache_miss(addr, false, prefetch_abort);
-        if (!ptr)
-            error("Bad PC: %08x\n", addr);
-    }
-    return ptr;
-#endif
+return addr_cache_miss(addr, false, prefetch_abort);
 }
 
 /*void cpu_thumb_loop()

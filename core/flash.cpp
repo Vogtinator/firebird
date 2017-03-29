@@ -26,18 +26,13 @@ bool nand_initialize(bool large, const char *filename) {
     memcpy(&nand.metrics, &chips[large], sizeof(nand_metrics));
     nand.state = 0xFF;
 
-    nand_data = (uint8_t*) os_map_cow(filename, large ? 132*1024*1024 : 33*1024*1024);
-    if(!nand_data)
-        nand_deinitialize();
+    nand_data = (uint8_t*) nullptr;
 
-    return nand_data != nullptr;
+    return true;
 }
 
 void nand_deinitialize()
 {
-    if(nand_data)
-        os_unmap_cow(nand_data, (nand.metrics.num_pages == 0x840) ? 132*1024*1024 : 33*1024*1024);
-
     nand_data = nullptr;
 }
 
@@ -57,10 +52,6 @@ void nand_write_command_byte(uint8_t command) {
             if (nand.state == 0x80) {
                 if (!nand.nand_writable)
                     error("program with write protect on");
-                uint8_t *pagedata = &nand_data[nand.nand_row * nand.metrics.page_size + nand.nand_col];
-                int i;
-                for (i = 0; i < nand.nand_buffer_pos; i++)
-                    pagedata[i] &= nand.nand_buffer[i];
                 nand.nand_block_modified[nand.nand_row >> nand.metrics.log2_pages_per_block] = true;
                 nand.state = 0xFF;
             }
@@ -85,8 +76,6 @@ void nand_write_command_byte(uint8_t command) {
                     warn("NAND flash: erase nonexistent block %x", nand.nand_row);
                     nand.nand_row &= ~block_bits; // Assume extra bits ignored like read
                 }
-                memset(&nand_data[nand.nand_row * nand.metrics.page_size], 0xFF,
-                        nand.metrics.page_size << nand.metrics.log2_pages_per_block);
                 nand.nand_block_modified[nand.nand_row >> nand.metrics.log2_pages_per_block] = true;
                 nand.state = 0xFF;
             }
@@ -143,7 +132,7 @@ uint8_t nand_read_data_byte() {
                 //warn("NAND read past end of page");
                 return 0;
             }
-            return nand_data[nand.nand_row * nand.metrics.page_size + nand.nand_col++];
+            return 0;
         case 0x70: return 0x40 | (nand.nand_writable << 7); // Status register
         case 0x90: nand.state++; return nand.metrics.chip_manuf;
         case 0x90+1: if(nand.metrics.chip_model == 0xA1) nand.state++; else nand.state = 0xFF; return nand.metrics.chip_model;
@@ -163,7 +152,7 @@ uint32_t nand_read_data_word() {
                 //warn("NAND read past end of page");
                 return 0;
             }
-            return *(uint32_t *)&nand_data[nand.nand_row * nand.metrics.page_size + (nand.nand_col += 4) - 4];
+            return 0;
         case 0x70: return 0x40 | (nand.nand_writable << 7); // Status register
         case 0x90: nand.state = 0xFF; return nand.metrics.chip_model << 8 | nand.metrics.chip_manuf;
         default:
@@ -282,9 +271,6 @@ void nand_phx_write_word(uint32_t addr, uint32_t value) {
 
                 if (nand.phx.op_size >= 0x200) { // XXX: what really triggers ECC?
                     // Set ECC register
-                    if (!memcmp(&nand_data[0x206], "\xFF\xFF\xFF", 3))
-                        nand.phx.ecc = 0xFFFFFF; // flash image created by old version of nspire_emu
-                    else
                         nand.phx.ecc = ecc_calculate(ptr);
                 }
             }
@@ -404,6 +390,7 @@ size_t flash_partition_offset(Partition p, struct nand_metrics *nand_metrics, ui
 }
 
 bool flash_open(const char *filename) {
+return true;
     bool large = false;
     if(flash_file)
         fclose(flash_file);
@@ -731,35 +718,9 @@ bool flash_create_new(bool flag_large_nand, const char **preload_file, unsigned 
 }
 
 bool flash_read_settings(uint32_t *sdram_size, uint32_t *product, uint32_t *features, uint32_t *asic_user_flags) {
-    assert(nand_data);
-
     *sdram_size = 32 * 1024 * 1024;
     *features = 0;
     *asic_user_flags = 0;
-
-    if (*(uint32_t *)&nand_data[0] == 0xFFFFFFFF) {
-        // No manuf data = CAS+
-        *product = 0x0C0;
-        return true;
-    }
-
-    struct manuf_data_804 *manuf = (struct manuf_data_804 *)&nand_data[0x844];
-    *product = manuf->product << 4 | manuf->revision;
-
-    static const unsigned char flags[] = { 1, 0, 0, 1, 0, 3, 2 };
-    if (manuf->product >= 0x0C && manuf->product <= 0x12)
-        *asic_user_flags = flags[manuf->product - 0x0C];
-
-    if (*product >= 0x0F0 && manuf->ext.signature == 0x4C9E5F91) {
-        uint32_t cfg = manuf->ext.config_sdram;
-        int logsize = (cfg & 7) + (cfg >> 3 & 7);
-        if (logsize > 4) {
-            emuprintf("Invalid SDRAM size in flash\n");
-            return false;
-        }
-        *features = manuf->ext.features;
-        *sdram_size = (4 * 1024 * 1024) << logsize;
-    }
 
     return true;
 }
@@ -902,9 +863,6 @@ void flash_close()
 
 void flash_set_bootorder(BootOrder order)
 {
-    assert(nand_data);
-
-    if(order == ORDER_DEFAULT)
         return;
 
     size_t bootdata_offset = flash_partition_offset(PartitionBootdata, &nand.metrics, nand_data);

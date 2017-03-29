@@ -39,7 +39,7 @@ void armloader_cb(void) {
  * callback() will be called once the snippet has finished its execution. Can be NULL.
  * returns 0 if success.
  */
-bool armloader_load_snippet(enum SNIPPETS snippet, struct armloader_load_params params[],  uint32_t params_num, void (*callback)(struct arm_state*)) {
+bool armloader_load_snippet(enum SNIPPETS snippet, struct armloader_load_params params[], unsigned params_num, void (*callback)(struct arm_state*)) {
     uint32_t i;
     uint32_t code_size = snippets_bin_len;
     void *code_ptr;

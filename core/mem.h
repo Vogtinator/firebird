@@ -35,7 +35,8 @@ void *phys_mem_ptr(uint32_t addr, uint32_t size);
  * These can't be per-byte because a translation index wouldn't fit then.
  * This does mean byte/halfword accesses have to mask off the low bits to
  * check flags, but the alternative would be another 32MB of memory overhead. */
-#define RAM_FLAGS(memptr) (*(uint32_t *)((uint8_t *)(memptr) + MEM_MAXSIZE))
+static uint32_t asdf = 0;
+#define RAM_FLAGS(memptr) (asdf)
 
 #define RF_READ_BREAKPOINT   1
 #define RF_WRITE_BREAKPOINT  2

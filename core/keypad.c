@@ -112,12 +112,12 @@ void keypad_reset() {
     sched.items[SCHED_KEYPAD].proc = keypad_scan_event;
 }
 
-void touchpad_write(uint8_t addr, uint8_t value) {
+void ftouchpad_write(uint8_t addr, uint8_t value) {
     //printf("touchpad write: %02x %02x %02x\n", keypad.touchpad_page, addr, value);
     if (addr == 0xFF)
         keypad.touchpad_page = value;
 }
-uint8_t touchpad_read(uint8_t addr) {
+uint8_t ftouchpad_read(uint8_t addr) {
     //printf("touchpad read:  %02x\n", addr);
     if (addr == 0xFF)
         return keypad.touchpad_page;
@@ -225,7 +225,7 @@ void touchpad_gpio_change() {
                 }
 read_again:
                 keypad.touchpad_gpio.bitcount = 0;
-                keypad.touchpad_gpio.byte = touchpad_read(keypad.touchpad_gpio.port);
+                keypad.touchpad_gpio.byte = ftouchpad_read(keypad.touchpad_gpio.port);
                 if (keypad.touchpad_gpio.port != 0xFF)
                     keypad.touchpad_gpio.port++;
                 keypad.touchpad_gpio.state = 8;
@@ -241,7 +241,7 @@ read_again:
                 keypad.touchpad_gpio.state = 6;
                 break;
             case 6: // C->T value
-                touchpad_write(keypad.touchpad_gpio.port, keypad.touchpad_gpio.byte);
+                ftouchpad_write(keypad.touchpad_gpio.port, keypad.touchpad_gpio.byte);
                 if (keypad.touchpad_gpio.port != 0xFF)
                     keypad.touchpad_gpio.port++;
                 gpio.input.b[0] &= ~8;
@@ -271,7 +271,7 @@ uint32_t touchpad_cx_read(uint32_t addr) {
             if (!keypad.touchpad_cx.reading)
                 break;
             keypad.touchpad_cx.reading--;
-            uint32_t val = touchpad_read(keypad.touchpad_cx.port++);
+            uint32_t val = ftouchpad_read(keypad.touchpad_cx.port++);
             //printf("Port %02x = %02x\n", touchpad_cx.port - 1, val);
             return val;
         case 0x0070:
@@ -293,7 +293,7 @@ void touchpad_cx_write(uint32_t addr, uint32_t value) {
                 if (value & 0x100) {
                     keypad.touchpad_cx.reading++;
                 } else {
-                    touchpad_write(keypad.touchpad_cx.port++, value);
+                    ftouchpad_write(keypad.touchpad_cx.port++, value);
                 }
             }
             return;

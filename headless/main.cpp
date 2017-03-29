@@ -63,14 +63,8 @@ void throttle_timer_wait() {}
 
 int main(int argc, char *argv[])
 {
-    if(argc != 3)
-    {
-        fprintf(stderr, "Usage: %s boot1.img flash.img\n", argv[0]);
-        return 1;
-    }
-
-    path_boot1 = argv[1];
-    path_flash = argv[2];
+    path_boot1 = "/documents/ndless/boot1.tns";
+    path_flash = "";
 
     if(!emu_start(0, 0, NULL))
         return 1;

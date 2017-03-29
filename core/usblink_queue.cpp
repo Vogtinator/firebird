@@ -26,7 +26,6 @@ struct usblink_queue_action {
     void *user_data;
 };
 
-static std::atomic_bool busy;
 static std::queue<usblink_queue_action> usblink_queue;
 
 static void dirlist_callback(struct usblink_file *f, bool is_error, void *user_data)
@@ -41,7 +40,6 @@ static void dirlist_callback(struct usblink_file *f, bool is_error, void *user_d
     if(!f)
     {
         usblink_queue.pop();
-        busy = false;
     }
 }
 
@@ -67,14 +65,12 @@ static void progress_callback(int progress, void *user_data)
     if(progress < 0 || progress == 100)
     {
         usblink_queue.pop();
-        busy = false;
     }
 }
 
 void usblink_queue_do()
 {
     bool b = false;
-    if(!usblink_connected || usblink_queue.empty() || !busy.compare_exchange_strong(b, true))
         return;
 
     usblink_queue_action action = usblink_queue.front();
@@ -84,14 +80,12 @@ void usblink_queue_do()
         if(!usblink_put_file(action.filepath.c_str(), action.path.c_str(), progress_callback, action.user_data))
         {
             progress_callback(-1, action.user_data);
-            busy = false;
         }
         break;
     case usblink_queue_action::SEND_OS:
         if(!usblink_send_os(action.filepath.c_str(), progress_callback, action.user_data))
         {
             progress_callback(-1, action.user_data);
-            busy = false;
         }
         break;
     case usblink_queue_action::DIRLIST:
@@ -113,7 +107,6 @@ void usblink_queue_do()
         if(!usblink_get_file(action.path.c_str(), action.filepath.c_str(), progress_callback, action.user_data))
         {
             progress_callback(-1, action.user_data);
-            busy = false;
         }
     }
 }
@@ -132,7 +125,6 @@ void usblink_queue_reset()
         usblink_queue.pop();
     }
 
-    busy = false;
 
     usblink_reset();
 }
