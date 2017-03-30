@@ -12,6 +12,7 @@ extern "C" void gdbstub_debugger() {}*/
 
 void gui_do_stuff(bool wait)
 {
+lcd_cx_draw_frame(*reinterpret_cast<uint16_t**>(0xc0000010));
 }
 
 void do_stuff(int i)
