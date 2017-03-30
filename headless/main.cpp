@@ -4,6 +4,12 @@
 #include "core/debug.h"
 #include "core/emu.h"
 
+/*extern "C" void gdbstub_reset() {}
+extern "C" void gdbstub_init() {}
+extern "C" void gdbstub_quit() {}
+extern "C" void gdbstub_recv() {}
+extern "C" void gdbstub_debugger() {}*/
+
 void gui_do_stuff(bool wait)
 {
 }

@@ -154,6 +154,7 @@ void undefined_instruction()
 
 void *try_ptr(uint32_t addr)
 {
+return addr_cache_miss(addr, false, nullptr);
     //There are two different addr_cache formats...
 #ifdef AC_FLAGS
     uintptr_t entry = *(uintptr_t*)(addr_cache + ((addr >> 10) << 1));

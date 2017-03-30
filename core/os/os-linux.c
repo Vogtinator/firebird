@@ -1,6 +1,11 @@
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE
 
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
 #ifdef __APPLE__
     #include <mach/clock.h>
     #include <mach/mach.h>
@@ -85,7 +90,7 @@ void os_sparse_decommit(void *page, size_t size)
 }
 
 void *os_alloc_executable(size_t size)
-{return NULL;
+{
 #if defined(__i386__) || defined(__x86_64__)
     // Has to be in 32-bit space for the JIT
     void *ptr = mmap((void*)0x30000000, size, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_SHARED|MAP_ANON|MAP_32BIT, -1, 0);

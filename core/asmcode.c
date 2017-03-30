@@ -23,7 +23,7 @@ uint8_t FASTCALL read_byte(uint32_t addr)
     uint32_t *ptr = addr_cache_miss(addr, false, data_abort);
     if(ptr)
         return *ptr;
-    return mmio_read_word(addr);
+    return mmio_read_byte(addr);
 }
 
 uint16_t FASTCALL read_half(uint32_t addr)
@@ -31,7 +31,7 @@ uint16_t FASTCALL read_half(uint32_t addr)
     uint32_t *ptr = addr_cache_miss(addr, false, data_abort);
     if(ptr)
         return *ptr;
-    return mmio_read_word(addr);
+    return mmio_read_half(addr);
 }
 void FASTCALL write_word(uint32_t addr, uint32_t value)
 {

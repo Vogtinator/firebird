@@ -585,7 +585,7 @@ static void native_debugger(void) {
             if(exiting)
                 return;
 
-            char *copy = nullptr;
+            char *copy = (char*) debug_input_cur;
             if(!copy)
                 return;
 

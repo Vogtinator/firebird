@@ -721,6 +721,7 @@ bool flash_read_settings(uint32_t *sdram_size, uint32_t *product, uint32_t *feat
     *sdram_size = 32 * 1024 * 1024;
     *features = 0;
     *asic_user_flags = 0;
+    *product = 0x0E;
 
     return true;
 }

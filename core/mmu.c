@@ -232,7 +232,7 @@ void *addr_cache_miss(uint32_t virt, bool writing, fault_proc *fault) {
     return ptr;
 }
 
-void addr_cache_flush() {return;
+void addr_cache_flush() {
     uint32_t i;
 
     if (arm.control & 1) {
@@ -241,7 +241,7 @@ void addr_cache_flush() {return;
             error("Bad translation table base register: %x", arm.translation_table_base);
         memcpy(mmu_translation_table, table, 0x4000);
     }
-
+return;
     for (i = 0; i < AC_VALID_MAX; i++) {
         uint32_t offset = ac_valid_list[i];
         //	if (ac_commit_map[offset / (AC_PAGE_SIZE / sizeof(ac_entry))])
