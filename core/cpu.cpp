@@ -15,6 +15,7 @@
 #include "emu.h"
 #include "mem.h"
 #include "mmu.h"
+#include "pattern.h"
 #include "translate.h"
 
 // Global CPU state
@@ -44,6 +45,7 @@ void cpu_arm_loop()
         #endif
 
         uint32_t *flags_ptr = &RAM_FLAGS(p);
+        const pattern_func *pattern;
 
         // Check for pending events
         if(cpu_events)
@@ -52,6 +54,14 @@ void cpu_arm_loop()
             if(cpu_events & ~EVENT_DEBUG_STEP)
                 break;
             goto enter_debugger;
+        }
+
+        pattern = pattern_match(p, arm.reg[15]);
+        if(pattern)
+        {
+            assert(pattern->interpreter_func);
+            if(pattern->interpreter_func())
+                continue;
         }
 
 #ifndef NO_TRANSLATION

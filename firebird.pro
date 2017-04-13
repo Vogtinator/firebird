@@ -162,6 +162,7 @@ SOURCES += $$ASMCODE_IMPL \
     core/coproc.cpp \
     core/cpu.cpp \
     core/thumb_interpreter.cpp \
+    core/pattern.cpp \
     core/usblink_queue.cpp \
     core/armsnippets_loader.c \
     core/casplus.c \
@@ -187,7 +188,8 @@ SOURCES += $$ASMCODE_IMPL \
     core/emu.cpp \
     usblinktreewidget.cpp \
     kitmodel.cpp \
-    fbaboutdialog.cpp
+    fbaboutdialog.cpp \
+    core/pattern_impl.cpp
 
 FORMS += \
     mainwindow.ui \
@@ -223,6 +225,7 @@ HEADERS += \
     core/mem.h \
     core/misc.h \
     core/mmu.h \
+    core/pattern.h \
     core/schedule.h \
     core/sha256.h \
     core/translate.h \
