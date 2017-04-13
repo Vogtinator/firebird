@@ -1,6 +1,6 @@
-#FLAGS := -g -O3 -flto -fno-fat-lto-objects -DBENCHMARK -Wall -I.. -fuse-ld=gold
-FLAGS := -DBENCHMARK -Wall -I..
-#FLAGS := -DBENCHMARK -Wall -I.. -fuse-ld=gold
+FLAGS := -g -O3 -flto -fno-fat-lto-objects -DBENCHMARK -Wall -I.. -fuse-ld=gold
+#FLAGS := -DBENCHMARK -Wall -I..
+#FLAGS := -g -DBENCHMARK -Wall -I.. -fuse-ld=gold
 CFLAGS := -std=c11 $(FLAGS)
 CXXFLAGS := -std=c++11 $(FLAGS)
 LFLAGS := -lz

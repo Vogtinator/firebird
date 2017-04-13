@@ -246,8 +246,72 @@ void *addr_cache_miss(uint32_t virt, bool writing, fault_proc *fault) {
     return ptr;
 }
 
+void addr_cache_flush_range(uint32_t start, uint32_t end)
+{
+    if (arm.control & 1) {
+        uint32_t *table = phys_mem_ptr(arm.translation_table_base, 0x4000);
+        if (!table)
+            error("Bad translation table base register: %x", arm.translation_table_base);
+
+        memcpy(mmu_translation_table + (start >> 20), table + (start >> 20), ((end - start) >> 20) * 4);
+    }
+
+	for(; start < end; start += 1 << 10)
+	{
+                uintptr_t *entry = (uintptr_t*)(&addr_cache[start >> 10 * 2]);
+/*		if(*entry & AC_INVALID)
+			continue;*/
+
+		#ifndef NO_TRANSLATION
+		// If entry points to memory, flush translations
+		if(!(*entry & AC_NOT_PTR))
+			for(uintptr_t pstart = *entry + start; pstart < *entry + start + (1<<10); pstart += 4)
+			{
+				uint32_t ram_flags = RAM_FLAGS(pstart);
+				if(ram_flags & RF_CODE_TRANSLATED)
+					invalidate_translation(ram_flags >> RFS_TRANSLATION_INDEX);
+			}
+		#endif
+
+		AC_SET_ENTRY_INVALID(*entry, start);
+		AC_SET_ENTRY_INVALID(*(entry + 1), start);
+	}    
+}
+
 void addr_cache_flush() {
-    uint32_t i;
+/*	static unsigned int count = 0;
+	static struct { uint32_t addr; unsigned int count; } addrs[1024];
+	static unsigned int addr_count = 0;
+	count++;
+	bool found = false;
+	for(unsigned int i = 0; i < addr_count; ++i)
+	{
+		if(addrs[i].addr != arm.reg[15])
+			continue;
+		addrs[i].count += 1;
+		found = true;
+		break;	
+	}
+
+	if(!found)
+	{
+		addrs[addr_count].addr = arm.reg[15];
+		addrs[addr_count++].count = 1;
+	}
+
+	if(count % 1024 == 0)
+	{
+		printf("%d (%d)\n", count, addr_count);
+
+		for(unsigned int i = 0; i < addr_count; ++i)
+{
+			printf("%.08x: %d\t", addrs[i].addr, addrs[i].count);
+        disasm_arm_insn2(addrs[i].addr, phys_mem_ptr(addrs[i].addr, 4));
+
+}
+
+		addr_count = 0;
+	}*/
 
     if (arm.control & 1) {
         void *table = phys_mem_ptr(arm.translation_table_base, 0x4000);
@@ -256,11 +320,38 @@ void addr_cache_flush() {
         memcpy(mmu_translation_table, table, 0x4000);
     }
 
-    for (i = 0; i < AC_VALID_MAX; i++) {
+    for (uint32_t i = 0; i < AC_VALID_MAX; i++) {
         uint32_t offset = ac_valid_list[i];
         //	if (ac_commit_map[offset / (AC_PAGE_SIZE / sizeof(ac_entry))])
         addr_cache_invalidate(offset);
     }
+return;
+    #ifndef SUPPORT_LINUX
+    if((arm.reg[15] & 0xFF00000) == 0x11000000)
+        return;
+    ac_valid_index = 0;
+    // Prefault locations that are often accessed
+    uint32_t ranges[] = {0, 0+512*1024, 0x10000000, 0x13000000, 0xA4000000, 0xA4020000};
+    for(unsigned int i = 0; i < 3; ++i)
+    {
+        for(uint32_t addr = ranges[i*2]; addr < ranges[i*2+1]; addr += 1 << 10)
+        {
+            ac_entry entry;
+            uintptr_t phys = mmu_translate(addr, false, NULL, NULL);
+            uint8_t *ptr = phys_mem_ptr(phys, 1);
+            if (ptr) {
+                AC_SET_ENTRY_PTR(entry, addr, ptr)
+            } else {
+                AC_SET_ENTRY_PHYS(entry, addr, phys)
+            }
+            uint32_t offset = (addr >> 10) * 2;
+            addr_cache[offset] = entry;
+            addr_cache[offset + 1] = entry;
+            ac_valid_list[ac_valid_index++] = offset;
+            ac_valid_list[ac_valid_index++] = offset+1;
+        }
+    }
+    #endif
 
     flush_translations();
 }
