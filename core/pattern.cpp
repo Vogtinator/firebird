@@ -26,7 +26,6 @@ void pattern_initialize()
 
 	// See comment on struct pattern_match for explanation.
 	assert(pattern_max_size <= 2*1024);
-	
 }
 
 const pattern_func *pattern_match(const void *phys_ptr, uint32_t virt_ptr)

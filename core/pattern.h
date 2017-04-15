@@ -41,7 +41,7 @@ typedef struct {
     pattern_func func;
 } pattern_entry ;
 
-#define PATTERN_ENTRY_COUNT 1
+#define PATTERN_ENTRY_COUNT 2
 extern const pattern_entry pattern_matches[PATTERN_ENTRY_COUNT];
 
 void pattern_initialize();

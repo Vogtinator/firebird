@@ -60,6 +60,31 @@ static const pattern_func pattern_memcpy_func = {
     .jit_func = nullptr,
 };
 
+static const uint32_t pattern_8bparity_insns[7] =
+{
+    0xe59f3010, 0xe0200220, 0xe200000f, 0xe1a00053,
+    0xe2000001, 0xe12fff1e, 0x00006996
+};
+
+bool pattern_8bparity_interp()
+{
+    uint32_t value = arm.reg[1];
+    arm.reg[0] = (0x6996 >> ((value ^ (value >> 4)) & 0xF)) & 1;
+
+    arm.reg[15] = arm.reg[14]; // bx lr
+
+    cycle_count_delta += 8;
+
+    return true;
+}
+
+static const pattern_func pattern_8bparity_func = {
+    .interpreter_func = pattern_8bparity_interp,
+    .jit_func = nullptr,
+};
+
 const pattern_entry pattern_matches[PATTERN_ENTRY_COUNT] = {
     {.first_insn = pattern_memcpy_insns[0], .next_insns = pattern_memcpy_insns + 1, .next_insns_size = sizeof(pattern_memcpy_insns) - 4, .func = pattern_memcpy_func},
+    {.first_insn = pattern_8bparity_insns[0], .next_insns = pattern_8bparity_insns + 1, .next_insns_size = sizeof(pattern_8bparity_insns) - 4, .func = 
+pattern_8bparity_func},
 };
