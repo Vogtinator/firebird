@@ -29,6 +29,7 @@
 #include "mem.h"
 #include "mmu.h"
 #include "translate.h"
+#include "pattern.h"
 #include "os/os.h"
 
 #ifdef __thumb__
@@ -38,6 +39,7 @@
 extern "C" {
 extern void translation_jmp_ptr() __asm__("translation_jmp_ptr");
 extern void translation_next() __asm__("translation_next");
+extern void translation_next_enter() __asm__("translation_next_enter");
 extern void translation_next_bx() __asm__("translation_next_bx");
 extern void **translation_sp __asm__("translation_sp");
 #ifdef IS_IOS_BUILD
@@ -515,8 +517,6 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
     assert(!flags_changed);
 
     // This loop is executed once per instruction.
-    // Due to the CPU being able to jump to each instruction seperately,
-    // there is no state preserved between (virtual) instructions.
     while(1)
     {
         // Translate further?
@@ -551,11 +551,34 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
         bool can_jump_here = !flags_loaded && !regmap_any_mapped;
 
+        const pattern_func *pattern = nullptr;
+
         if(i.cond != CC_AL && i.cond != CC_NV)
         {
             need_flags();
             cond_branch = translate_current;
             emit(0x0a000000 | ((i.cond ^ 1) << 28));
+        }
+        else if((pattern = pattern_match(insn_ptr, pc)) != nullptr)
+        {
+            /* As long as interpreter_func does not modify any flags
+               and cause exceptions, the ABI is close enough to just call it
+               directly. */
+            emit_call(reinterpret_cast<void*>(pattern->interpreter_func));
+
+            /* It returns 0 if it was not possible to interpret it. */
+            emit_al(0x3500000); // cmp r0, #0
+            cond_branch = translate_current;
+            emit(0x0a000000); // beq insn_jit
+            emit_ldr_armreg(R0, PC);
+            emit_jmp(reinterpret_cast<void*>(translation_next_enter), false);
+            // insn_jit:
+            *cond_branch |= (translate_current - cond_branch - 2) & 0xFFFFFF;
+            cond_branch = nullptr;
+
+            /* This is unlikely to happen, so stop JIT'ing the pattern except
+               for the first required instruction. */
+            stop_here = true;
         }
 
         if((insn & 0xE000090) == 0x0000090)

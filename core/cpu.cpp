@@ -56,14 +56,6 @@ void cpu_arm_loop()
             goto enter_debugger;
         }
 
-        pattern = pattern_match(p, arm.reg[15]);
-        if(pattern)
-        {
-            assert(pattern->interpreter_func);
-            if(pattern->interpreter_func())
-                continue;
-        }
-
 #ifndef NO_TRANSLATION
         // If the instruction is translated, use the translation
         if(*flags_ptr & RF_CODE_TRANSLATED)
@@ -99,6 +91,14 @@ void cpu_arm_loop()
             continue;
         }
 #endif
+
+        pattern = pattern_match(p, arm.reg[15]);
+        if(pattern)
+        {
+            assert(pattern->interpreter_func);
+            if(pattern->interpreter_func())
+                continue;
+        }
 
         arm.reg[15] += 4; // Increment now to account for the pipeline
         ++cycle_count_delta;

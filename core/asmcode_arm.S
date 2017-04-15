@@ -100,7 +100,7 @@ translation_next_bx: .global translation_next_bx
 translation_next: .global translation_next
     str     r0, [r10, #15*4] // save to arm.reg[15]
 
-translation_next_enter:
+translation_next_enter: .global translation_next_enter
     loadsym r1, cycle_count_delta
     ldr     r1, [r1]
     cmp     r1, #0

@@ -41,7 +41,7 @@ const pattern_func *pattern_match(const void *phys_ptr, uint32_t virt_ptr)
 		if(match.first_insn != first_insn)
 			continue;
 
-        if(memcmp((void*)(uintptr_t(phys_ptr) + 4), match.next_insns, match.next_insns_size) == 0)
+		if(memcmp((void*)(uintptr_t(phys_ptr) + 4), match.next_insns, match.next_insns_size) == 0)
 			return &match.func;
 	}
 
