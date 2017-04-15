@@ -1,5 +1,5 @@
-#FLAGS := -g -O3 -flto -fno-fat-lto-objects -DBENCHMARK -Wall -I.. -fuse-ld=gold
-FLAGS := -DBENCHMARK -Wall -I..
+FLAGS := -g -O3 -flto -fno-fat-lto-objects -DBENCHMARK -Wall -Wextra -I.. -fuse-ld=gold
+#FLAGS := -DBENCHMARK -Wall -I..
 #FLAGS := -DBENCHMARK -Wall -I.. -fuse-ld=gold
 CFLAGS := -std=c11 $(FLAGS)
 CXXFLAGS := -std=c++11 $(FLAGS)
@@ -15,6 +15,7 @@ CSOURCES   := ../core/armsnippets_loader.c ../core/asmcode.c ../core/casplus.c .
 
 CPPSOURCES := ../core/arm_interpreter.cpp ../core/coproc.cpp ../core/cpu.cpp ../core/debug.cpp ../core/emu.cpp \
 	      ../core/flash.cpp ../core/gif.cpp ../core/thumb_interpreter.cpp ../core/usblink_queue.cpp main.cpp \
+              ../core/pattern.cpp ../core/pattern_impl.cpp \
 	      ../core/translate_arm.cpp
 
 OBJS = $(patsubst %.S, %.o, $(ASMSOURCES))
