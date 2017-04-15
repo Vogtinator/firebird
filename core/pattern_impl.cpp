@@ -68,7 +68,7 @@ static const uint32_t pattern_8bparity_insns[7] =
 
 bool pattern_8bparity_interp()
 {
-    uint32_t value = arm.reg[1];
+    uint32_t value = arm.reg[0];
     arm.reg[0] = (0x6996 >> ((value ^ (value >> 4)) & 0xF)) & 1;
 
     arm.reg[15] = arm.reg[14]; // bx lr
