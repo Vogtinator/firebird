@@ -45,7 +45,6 @@ void cpu_arm_loop()
         #endif
 
         uint32_t *flags_ptr = &RAM_FLAGS(p);
-        const pattern_func *pattern;
 
         // Check for pending events
         if(cpu_events)
@@ -90,15 +89,17 @@ void cpu_arm_loop()
             translate(arm.reg[15], &p->raw);
             continue;
         }
-#endif
+#else
 
-        pattern = pattern_match(p, arm.reg[15]);
+        auto pattern = pattern_match(p, arm.reg[15]);
         if(pattern)
         {
             assert(pattern->interpreter_func);
             if(pattern->interpreter_func())
                 continue;
         }
+
+#endif
 
         arm.reg[15] += 4; // Increment now to account for the pipeline
         ++cycle_count_delta;
