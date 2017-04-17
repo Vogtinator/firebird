@@ -52,7 +52,13 @@ void gui_debugger_request_input(debug_input_cb callback)
     callback(debug_in);
 }
 
-void gui_putchar(char c) { putc(c, stdout); }
+void gui_putchar(char c)
+{
+    #ifndef BENCHMARK
+        putc(c, stdout);
+    #endif
+}
+
 int gui_getchar() { return -1; }
 void gui_set_busy(bool busy) {}
 void gui_show_speed(double d) {}
